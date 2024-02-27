@@ -215,6 +215,18 @@ public class Mod : ModBase // <= Do not Remove.
         // Ensure to start with a fresh base, Otherwise if all mods are unloaded, the modded data.i still stays
         File.WriteAllBytes(gameDataIndexPath, origIndex);
 
+        // Also make a backup of the original data.i in the game's directory
+        string gameDirOriginalIndexPath = Path.Combine(gameDir, "orig_data.i");
+        try
+        {
+            LogInfo($"Copying original data.i to '{gameDirOriginalIndexPath}' for backup purposes");
+            File.Copy(modLoaderDataIndexPath, gameDirOriginalIndexPath, overwrite: true);
+        }
+        catch (Exception e)
+        {
+            LogWarn($"WARN: Attempted to create an original data.i backup but copy to {gameDirOriginalIndexPath} failed - {e.Message}");
+        }
+
         return true;
     }
 
@@ -292,7 +304,9 @@ public class Mod : ModBase // <= Do not Remove.
         _index.Codename = INDEX_MODDED_CODENAME; // Helps us keep of track whether this is an original index or not
 
         IndexFile.Serializer.Write(outBuf, _index);
-        File.WriteAllBytes(Path.Combine(Path.GetDirectoryName(_modLoader.GetAppConfig().AppLocation)!, "data.i"), outBuf);
+
+        string dataIndexPath = Path.Combine(Path.GetDirectoryName(_modLoader.GetAppConfig().AppLocation)!, "data.i");
+        File.WriteAllBytes(dataIndexPath, outBuf);
     }
 
 
@@ -311,6 +325,10 @@ public class Mod : ModBase // <= Do not Remove.
         _logger.WriteLine($"[GBFRelinkManager] {str}", _logger.ColorGreen);
     }
 
+    private void LogWarn(string str)
+    {
+        _logger.WriteLine($"[GBFRelinkManager] {str}", _logger.ColorYellow);
+    }
 
 
     #region Standard Overrides
