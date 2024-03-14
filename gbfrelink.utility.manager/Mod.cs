@@ -246,7 +246,7 @@ public class Mod : ModBase // <= Do not Remove.
         var allFiles = Directory.GetFiles(folder, "*.*", SearchOption.AllDirectories);
         foreach (string newPath in allFiles)
         {
-            File.Copy(newPath, newPath.Replace(folder, _dataPath), true);
+            ProcessFile(newPath, newPath.Replace(folder, _dataPath));
         }
 
         string[] files = Directory.GetFiles(folder, "*", SearchOption.AllDirectories);
@@ -269,6 +269,50 @@ public class Mod : ModBase // <= Do not Remove.
         LogInfo($"-> {files.Length} files have been added or updated to the external file list.");
     }
 
+    private void ProcessFile(string file, string output)
+    {
+        string ext = Path.GetExtension(file);
+        switch (ext)
+        {
+            case ".minfo":
+                UpgradeMInfoIfNeeded(file, output);
+                break;
+
+            default:
+                File.Copy(file, output, overwrite: true);
+                break;
+        }
+    }
+
+    private void UpgradeMInfoIfNeeded(string file, string output)
+    {
+        // GBFR v1.1.1 upgraded the minfo file - magic/build date changed, two new fields added.
+        // In order to avoid having ALL mod makers rebuild their mods, upgrade the magic as a post process operation
+
+        try
+        {
+            var minfoBytes = File.ReadAllBytes(file);
+            ModelInfo modelInfo = ModelInfo.Serializer.Parse(minfoBytes);
+
+            if (modelInfo.Magic < 20240213)
+            {
+                modelInfo.Magic = 10000_01_01;
+
+                int size = ModelInfo.Serializer.GetMaxSize(modelInfo);
+                byte[] buf = new byte[size];
+                ModelInfo.Serializer.Write(buf, modelInfo);
+                File.WriteAllBytes(output, buf);
+
+                LogInfo($"-> .minfo file '{file}' magic has been updated to be compatible");
+            }
+        }
+        catch (Exception e)
+        {
+            LogError($"Failed to process .minfo file, will be copied instead - {e.Message}");
+            File.Copy(file, output, overwrite: true);
+        }
+    }
+
     private bool AddOrUpdateExternalFile(ulong hash, ulong fileSize)
     {
         bool added = false;
@@ -282,7 +326,7 @@ public class Mod : ModBase // <= Do not Remove.
         }
         else
         {
-            _index.ExternalFileHashes[idx] = fileSize;
+            _index.ExternalFileSizes[idx] = fileSize;
         }
 
         return added;
